@@ -23,15 +23,17 @@
 
 %%
 
-clc; clear all;
+% clc; clear all;
 srcimg = imread('basketball-court.ppm');
+srcimg = double(srcimg);
 blkimg = zeros(940, 500);
 
 % corners of the blank image / correspondences
-pp = [0 500 500 0; 0 0 940 940; 1 1 1 1];
+pp = [1   500   500   1
+      1   1     940   940
+      1   1     1     1];
 
 % figure, imshow(srcimg); hold on;
-% 
 % [x,y] = ginput(4);
 % pix = [x'; y'; 1 1 1 1];
 
@@ -56,9 +58,11 @@ p = [pix(:,idx1) pix(:,idx2) pix(:,idx3) pix(:,idx4)];
 
 %% DLT algorithm
 
-% normalization
-[T1,p1] = normalization(p);
-[T2,p2] = normalization(pp);
+% % normalization
+% [T1,p1] = normalization(p);
+% [T2,p2] = normalization(pp);
+
+p1 = p; p2 = pp;
 
 % compute A
 j = 1;
@@ -71,19 +75,74 @@ end
 % svd of A
 [U,D,V] = svd(A);
 h = V(:,9);
-h = reshape(h,3,3)';
+H = reshape(h,3,3)';
 
-% denormalization
-H = inv(T2)*h*T1;
+% % denormalization
+% H = inv(T2)*H*T1;
 
 %% Applying the transformation to the source image
 
-T = maketform('projective', H);
-image = imtransform(srcimg, T);
-figure, imshow(image);
+% T = maketform('projective', H);
+% image = imtransform(srcimg, T);
+% figure, imshow(image);
+
+for i = 1:size(blkimg,1)
+    for j = 1:size(blkimg,2)
+        pt_tgt = [i j 1]';
+        pt_src = inv(H)*pt_tgt;
+        % setting the last coordinate to 1
+        pt_src = pt_src/pt_src(3);
+        
+        
+% fill colors simply rounding      
+%         % check if the point is inside the picture
+%         if (pt_src(1) > 0) && (pt_src(2) > 0) && ...
+%            (pt_src(1) <= size(srcimg,1)) && ...
+%            (pt_src(2) <= size(srcimg,2))
+%             pt_src = round(pt_src);
+%             color_r = srcimg(pt_src(1), pt_src(2), 1)/255;
+%             color_g = srcimg(pt_src(1), pt_src(2), 2)/255;
+%             color_b = srcimg(pt_src(1), pt_src(2), 3)/255;
+%             blkimg(i,j,1) = color_r;
+%             blkimg(i,j,2) = color_g;
+%             blkimg(i,j,3) = color_b;
+%         end
 
 
+% fill colors with bilinear interpolation       
+        % check if the point is inside the picture
+        if (pt_src(1) > 0) && (pt_src(2) > 0) && ...
+           (pt_src(1) <= size(srcimg,1)) && ...
+           (pt_src(2) <= size(srcimg,2))
+       
+           box = [floor(pt_src(1)) ceil(pt_src(1)) floor(pt_src(1)) ceil(pt_src(1))
+                  ceil(pt_src(2))  ceil(pt_src(2)) floor(pt_src(2)) floor(pt_src(2))];
+           a = pt_src(1) - box(1,1);
+           b = pt_src(2) - box(2,3);
 
+           color_r = (1-a) * (1-b) * srcimg(box(1,3), box(2,3), 1) ...
+                + a * (1-b) * srcimg(box(1,4), box(2,4), 1) ...
+                + a * b * srcimg(box(1,2), box(2,2), 1) ...
+                + (1-a) * b * srcimg(box(1,1), box(2,1), 1);
+
+           color_g = (1-a) * (1-b) * srcimg(box(1,3), box(2,3), 2) ...
+             + a * (1-b) * srcimg(box(1,4), box(2,4), 2) ...
+             + a * b * srcimg(box(1,2), box(2,2), 2) ...
+             + (1-a) * b * srcimg(box(1,1), box(2,1), 2);
+
+           color_b = (1-a) * (1-b) * srcimg(box(1,3), box(2,3), 3) ...
+             + a * (1-b) * srcimg(box(1,4), box(2,4), 3) ...
+             + a * b * srcimg(box(1,2), box(2,2), 3) ...
+             + (1-a) * b * srcimg(box(1,1), box(2,1), 3);
+       
+            blkimg(i,j,1) = color_r/255;
+            blkimg(i,j,2) = color_g/255;
+            blkimg(i,j,3) = color_b/255;
+        end        
+    end
+end
+
+figure, imshow(blkimg);
 
 
 
