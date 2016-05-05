@@ -1,0 +1,227 @@
+\documentclass{article}
+\usepackage{listings}
+
+\begin{document}
+
+\centerline{\sc \large CS 532: Homework Assignment 3}
+\vspace{.5pc}
+\centerline{Alana Laryssa Seabra A Santos}
+\centerline{\it 10/21/2015}
+\vspace{1pc}
+
+\section{Harris corner detection and matching}
+First, I computed the images derivatives using convolution, which is a fast function in Matlab. Second, I calculated the kernel of the gaussian smoothing using standard deviation equals to 1.5 for this distribution then I aplied this kernel to $I_x^2$, $I_y^2$ and $I_{xy}$ also using convolution. Now I had everything I needed to apply the Harris operator in each pixel of both images calculating the ration $determinant(H)/trace(H)$. Then I selected the corners that have ratio $>$ 120k. After that, I used non-maximum suppresion in 3x3 windows and ended up with 314 corners in left image and 376 in the right one. Then I computed the distances between corners in left image to the ones in the right image using SAD. I got a little confused in this part because the in the next step we were supposed to compare these values with the disparities in groundtruth. So I computed the distances with respect to the intensities in 3x3 windows, but I kept track of the estimated disparity of correspondences in epipolar lines, so I could compare these values with groundtruth. Finally, bellow are the correct and wrong correspondences report.
+
+\section{Errors report}
+\begin{itemize}
+\item{5\% most likely correspondences} \\ Correct: 65\\ Wrong: 5839
+\item{10\% most likely correspondences} \\ Correct: 116\\ Wrong: 11691
+\item{15\% most likely correspondences} \\ Correct: 155\\ Wrong: 17555
+\item{20\% most likely correspondences} \\ Correct: 203\\ Wrong: 23410
+\item{25\% most likely correspondences} \\ Correct: 241\\ Wrong: 29275
+\item{30\% most likely correspondences} \\ Correct: 278\\ Wrong: 35142
+\item{35\% most likely correspondences} \\ Correct: 320\\ Wrong: 41003
+\item{40\% most likely correspondences} \\ Correct: 361\\ Wrong: 46865
+\item{45\% most likely correspondences} \\ Correct: 397\\ Wrong: 52732
+\item{50\% most likely correspondences} \\ Correct: 440\\ Wrong: 58592
+\item{55\% most likely correspondences} \\ Correct: 482\\ Wrong: 64454
+\item{60\% most likely correspondences} \\ Correct: 520\\ Wrong: 70319
+\item{65\% most likely correspondences} \\ Correct: 555\\ Wrong: 76187
+\item{70\% most likely correspondences} \\ Correct: 602\\ Wrong: 82043
+\item{75\% most likely correspondences} \\ Correct: 653\\ Wrong: 87895
+\item{80\% most likely correspondences} \\ Correct: 706\\ Wrong: 93746
+\item{85\% most likely correspondences} \\ Correct: 766\\ Wrong: 99589
+\item{90\% most likely correspondences} \\ Correct: 816\\ Wrong: 105442
+\item{95\% most likely correspondences} \\ Correct: 876\\ Wrong: 111285
+\item{100\% most likely correspondences} \\ Correct: 918\\ Wrong: 117146
+\end{itemize}
+
+\section{Matlab code}
+\begin{lstlisting}[language=Matlab]
+
+clc; clear all;
+
+lft = double(imread('teddyL.pgm'));
+rgt = double(imread('teddyR.pgm'));
+
+height = size(lft, 1);
+width  = size(lft, 2);
+
+deriv = [-1 0 1
+         -1 0 1
+         -1 0 1];
+     
+lIx = conv2(lft, deriv, 'same');
+lIy = conv2(lft, deriv', 'same');
+rIx = conv2(rgt, deriv, 'same');
+rIy = conv2(rgt, deriv', 'same');
+
+% Ix = zeros(size(lft));
+% Iy = zeros(size(lft));
+% for i = 2:height-1
+%     for j = 2:width-1
+%         window = lft(i-1:i+1, j-1:j+1);
+%         Ix(i,j) = sum(window(:,3) - window(:,1));
+%         Iy(i,j) = sum(window(3,:) - window(1,:));             
+%     end
+% end
+
+lIxy = lIx.*lIy;
+rIxy = rIx.*rIy;
+
+% % % mean filter
+% win_filter = 5;
+% half_filter = (win_filter - 1)/2;
+% filtered = zeros(size(lft));
+% for i = win_filter:height-win_filter
+%     for j = win_filter:width-win_filter
+%         window = lft(i-half_filter:i+half_filter, j-half_filter:j+half_filter);     
+%        	filtered(i,j) = uint8(sum(sum(window))/(win_filter*win_filter));
+%     end
+% end
+
+win_gauss = 5;
+half_gauss = (win_gauss - 1)/2;
+sig = 1.5;
+[x,y] = meshgrid(-half_gauss:half_gauss, -half_gauss:half_gauss);
+G = exp(-(x.^2 + y.^2)/(2*sig^2));
+G = G./sum(G(:));
+
+lIx2g = conv2(lIx.^2, G, 'same');
+lIy2g = conv2(lIy.^2, G, 'same');
+lIxyg = conv2(lIxy, G, 'same');
+
+rIx2g = conv2(rIx.^2, G, 'same');
+rIy2g = conv2(rIy.^2, G, 'same');
+rIxyg = conv2(rIxy, G, 'same');
+
+win_harris = 5; % Matlab default
+half_harris = (win_harris - 1)/2;
+thresh = 120000;
+
+flft = zeros(size(lft));
+frgt = zeros(size(rgt));
+
+for i = half_harris+1:height-half_harris-1
+    for j = half_harris+1:width-half_harris-1
+        lSx2 = sum(sum(lIx2g(i-half_harris:i+half_harris, j-half_harris:j+half_harris)));
+        lSy2 = sum(sum(lIy2g(i-half_harris:i+half_harris, j-half_harris:j+half_harris))); 
+        lSxy = sum(sum(lIxyg(i-half_harris:i+half_harris, j-half_harris:j+half_harris)));
+        flft(i,j) = (lSx2*lSy2 - lSxy*lSxy)/(lSx2+lSy2);
+        
+        rSx2 = sum(sum(rIx2g(i-half_harris:i+half_harris, j-half_harris:j+half_harris)));
+        rSy2 = sum(sum(rIy2g(i-half_harris:i+half_harris, j-half_harris:j+half_harris))); 
+        rSxy = sum(sum(rIxyg(i-half_harris:i+half_harris, j-half_harris:j+half_harris)));
+        frgt(i,j) = (rSx2*rSy2 - rSxy*rSxy)/(rSx2+rSy2);   
+    end
+end
+
+flft(flft < thresh) = 0;
+frgt(frgt < thresh) = 0;
+
+cnt1 = 1;
+cnt2 = 1;
+
+half_nms = 1;
+
+% non max suppresion, 3x3 window
+for i = half_nms+1:size(lft,1)-half_nms-1
+    for j = half_nms+1:size(lft,2)-half_nms-1
+        if flft(i,j) ~= 0
+            window = flft(i-half_nms:i+half_nms, j-half_nms:j+half_nms);
+            if sum(sum(flft(i,j) < window)) == 0
+                corlft(cnt1,:) = [flft(i,j) i j];
+                cnt1 = cnt1+1;
+            else
+                flft(i,j) = 0;
+            end
+        end
+        
+        if frgt(i,j) ~= 0
+            window = frgt(i-half_nms:i+half_nms, j-half_nms:j+half_nms);
+            if sum(sum(frgt(i,j) < window)) == 0
+                corrgt(cnt2,:) = [frgt(i,j) i j];
+                cnt2 = cnt2+1;
+            else
+                frgt(i,j) = 0;
+            end
+        end
+    end
+end
+
+im = [lft rgt];
+ff = figure;
+imshow(im, [min(im(:)) max(im(:))]);
+hold on; scatter(corlft(:,3), corlft(:,2), 'MarkerFaceColor', 'm');
+hold on; scatter(width+corrgt(:,3), corrgt(:,2), 'MarkerFaceColor', 'g');
+
+disp('number of corners:')
+disp(length(corlft))
+disp(length(corrgt))
+
+cnt = 1;
+
+half_sad = 1;
+% SAD 3x3 ?????
+for i = 1:length(corlft)
+    for j = 1:length(corrgt)
+            xl = corlft(i,2);
+            yl = corlft(i,3);
+            xr = corrgt(j,2);
+            yr = corrgt(j,3);
+            windowl = lft(xl-half_sad:xl+half_sad, yl-half_sad:yl+half_sad);
+            windowr = rgt(xr-half_sad:xr+half_sad, yr-half_sad:yr+half_sad);
+            if (xl==xr)
+                aa = yl-yr; % have to save this so I can compare with groundtruth
+            else
+                aa = Inf;
+            end
+            distances(cnt,:) = [sum(sum(abs(windowl-windowr))) aa i j];
+            cnt = cnt+1;
+    end
+end
+
+for k = 5:5:100
+
+    n = ceil((k/100)*length(distances));
+    dd = sortrows(distances);
+    dd = dd(1:n,:);
+
+
+    XX = [corlft(dd(:,3),2)'; corrgt(dd(:,4),2)'];
+    YY = [corlft(dd(:,3),3)'; width+corrgt(dd(:,4),3)'];
+    figure(ff); hold on;
+    line(YY(:,1:25),XX(:,1:25), 'Color', [1 0 0]);
+
+    gt = imread('disp2.pgm');
+    gt = ceil(double(gt)./4);
+
+    correct = 0;
+
+    for i = 1:length(dd)
+        d = dd(i,4);
+        dgt = gt(corlft(dd(i,3),2), corlft(dd(i,3),3));
+
+        if abs(d-dgt) <= 1
+            correct = correct + 1;
+        end
+    end
+
+    % disp('error rate:');
+    % disp([1 - correct/length(dd)]);
+    % disp('correct/wrong correspondences: ')
+    % disp([correct length(dd)-correct])
+
+    disp(['\item{' num2str(k) '\% most likely correspondences} \\ Correct: ' ...
+        num2str(correct) '\\ Wrong: ' num2str(length(dd)-correct)])
+
+
+end
+
+
+
+\end{lstlisting}
+
+\end{document}
+
+

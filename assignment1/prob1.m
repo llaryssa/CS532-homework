@@ -23,22 +23,24 @@
 
 %%
 
-% clc; clear all;
+clc; clear all;
 srcimg = imread('basketball-court.ppm');
 blkimg = zeros(940, 500);
+
+% comment this block to use default
+figure, imshow(srcimg); hold on;
+[x,y] = ginput(4);
+pix = [x'; y'; 1 1 1 1];
+
+% % uncomment this block to use default
+% pix = [246   404   280    23
+%        51    75   280   193
+%        1     1     1     1];
 
 % corners of the blank image / correspondences
 pp = [1   500   500   1
       1   1     940   940
       1   1     1     1];
-
-figure, imshow(srcimg); hold on;
-[x,y] = ginput(4);
-pix = [x'; y'; 1 1 1 1];
-
-% pix = [243  403  278   23
-%        50   73   278  194
-%        1    1     1     1];
 
 %% sort the points so the correspondences make sense
 
@@ -141,6 +143,7 @@ for i = 1:size(blkimg,2)
 end
 
 figure, imshow(blkimg);
+imwrite(blkimg, 'output.png');
 
 
 
